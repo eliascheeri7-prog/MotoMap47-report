@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { saveReport } from '../lib/offlineQueue';
+import LocationPicker from './LocationPicker';
 
 const INCIDENT_TYPES = ['Structure fire', 'Bush/grass fire', 'Vehicle fire', 'Electrical fault', 'Gas leak', 'Other'];
 const SEVERITIES = [
@@ -8,42 +9,40 @@ const SEVERITIES = [
   { value: 'medium', label: 'Medium — contained but active' }
 ];
 
-export default function ReportForm({ reporterRole, onSubmitted }) {
+export default function ReportForm({ reporterRole, theme, onSubmitted }) {
   const [incidentType, setIncidentType] = useState(INCIDENT_TYPES[0]);
   const [severity, setSeverity] = useState('high');
   const [description, setDescription] = useState('');
   const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState(null);
   const [status, setStatus] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus('locating');
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const report = {
-            incident_type: incidentType,
-            severity,
-            description,
-            reporter_phone: phone || null,
-            reported_by: reporterRole,
-            status: 'active',
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          };
-          const result = await saveReport(report);
-          setStatus(result.status);
-          setDescription('');
-          onSubmitted?.(result.status);
-        } catch (err) {
-          console.error(err);
-          setStatus('error');
-        }
-      },
-      () => setStatus('error'),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    if (!location) return;
+    setSubmitting(true);
+    try {
+      const report = {
+        incident_type: incidentType,
+        severity,
+        description,
+        reporter_phone: phone || null,
+        reported_by: reporterRole,
+        status: 'active',
+        lat: location.lat,
+        lng: location.lng
+      };
+      const result = await saveReport(report);
+      setStatus(result.status);
+      setDescription('');
+      onSubmitted?.(result.status);
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -60,6 +59,11 @@ export default function ReportForm({ reporterRole, onSubmitted }) {
         <select value={severity} onChange={(e) => setSeverity(e.target.value)}>
           {SEVERITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+      </label>
+
+      <label>
+        Location
+        <LocationPicker theme={theme} onChange={setLocation} />
       </label>
 
       <label>
@@ -82,13 +86,13 @@ export default function ReportForm({ reporterRole, onSubmitted }) {
         />
       </label>
 
-      <button type="submit" disabled={status === 'locating'}>
-        {status === 'locating' ? 'Getting location…' : 'Submit report'}
+      <button type="submit" disabled={submitting || !location}>
+        {submitting ? 'Sending…' : 'Submit report'}
       </button>
 
       {status === 'synced' && <p className="status ok">✅ Sent — appears on the dashboard now.</p>}
       {status === 'queued' && <p className="status warn">📶 No connection — saved on this device, will send automatically once online.</p>}
-      {status === 'error' && <p className="status error">Couldn't get your location. Check location permissions and try again.</p>}
+      {status === 'error' && <p className="status error">Something went wrong. Please try again.</p>}
     </form>
   );
 }

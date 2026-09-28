@@ -11,15 +11,14 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "idb": "^8.0.0",
+    "maplibre-gl": "^4.5.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-map-gl": "^7.1.7"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.1",
     "vite-plugin-pwa": "^0.20.5"
-  },
-  "allowScripts": {
-    "esbuild@0.21.5": true
   }
 }

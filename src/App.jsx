@@ -1,11 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import ReportForm from './components/ReportForm';
+import Hero from './components/Hero';
+import EmergencyNotice from './components/EmergencyNotice';
+import Footer from './components/Footer';
+import LiveStats from './components/LiveStats';
+import RecentIncidents from './components/RecentIncidents';
+import ThemeToggle from './components/ThemeToggle';
+import InstallButton from './components/InstallButton';
+import OfflineBanner from './components/OfflineBanner';
+import QueueList from './components/QueueList';
+import { useTheme } from './lib/theme';
 import { syncPending, pendingCount } from './lib/offlineQueue';
 
 export default function App() {
+  const { mode, resolved, cycle } = useTheme();
   const [role, setRole] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pending, setPending] = useState(0);
+  const [queueKey, setQueueKey] = useState(0);
+
+  const refresh = useCallback(async () => {
+    setPending(await pendingCount());
+    setQueueKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     const goOnline = async () => { setIsOnline(true); await syncPending(); refresh(); };
@@ -17,39 +34,48 @@ export default function App() {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
     };
-  }, []);
-
-  const refresh = async () => setPending(await pendingCount());
-
-  if (!role) {
-    return (
-      <div className="app centered">
-        <h1>MotoMap47</h1>
-        <p className="tagline">Report a fire incident</p>
-        <div className="role-buttons">
-          <button onClick={() => setRole('officer')}>I'm a fire officer</button>
-          <button onClick={() => setRole('public')}>I'm a member of the public</button>
-        </div>
-      </div>
-    );
-  }
+  }, [refresh]);
 
   return (
     <div className="app">
-      <header>
-        <h1>MotoMap47</h1>
-        <span className={`connection-badge ${isOnline ? 'online' : 'offline'}`}>
-          {isOnline ? 'Online' : 'Offline'}
-        </span>
-      </header>
+      <div className="top-bar">
+        <ThemeToggle mode={mode} onCycle={cycle} />
+        <InstallButton />
+      </div>
 
-      {pending > 0 && (
-        <p className="pending-banner">{pending} report{pending > 1 ? 's' : ''} waiting to sync</p>
+      <OfflineBanner isOnline={isOnline} pendingCount={pending} />
+      <EmergencyNotice />
+
+      {!role ? (
+        <div className="landing">
+          <Hero />
+          <LiveStats />
+          <RecentIncidents />
+          <div className="role-buttons">
+            <button onClick={() => setRole('officer')}>
+              <span className="role-icon">🚒</span>
+              <span>I'm a fire officer</span>
+              <span className="role-subtext">Log an incident from the field</span>
+            </button>
+            <button onClick={() => setRole('public')}>
+              <span className="role-icon">🙋</span>
+              <span>I'm a member of the public</span>
+              <span className="role-subtext">Report something you've seen</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="report-screen">
+          <header>
+            <h1>MotoMap47</h1>
+          </header>
+          <ReportForm reporterRole={role} theme={resolved} onSubmitted={refresh} />
+          <QueueList refreshKey={queueKey} onSynced={refresh} />
+          <button className="link-button" onClick={() => setRole(null)}>← Switch role</button>
+        </div>
       )}
 
-      <ReportForm reporterRole={role} onSubmitted={refresh} />
-
-      <button className="link-button" onClick={() => setRole(null)}>Switch role</button>
+      <Footer />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { openDB } from 'idb';
-import { supabase } from './supabase';
+import { supabase, LIVE_SYNC_ENABLED } from './supabase';
 
 const DB_NAME = 'motomap47-reports';
 const STORE_NAME = 'pending';
@@ -16,7 +16,7 @@ const dbPromise = openDB(DB_NAME, 1, {
  * IndexedDB if offline. The dashboard's real-time subscription picks up
  * the insert the moment it lands in Supabase. */
 export async function saveReport(report) {
-  if (navigator.onLine) {
+    if (navigator.onLine && LIVE_SYNC_ENABLED) {
     const { error } = await supabase.from('incidents').insert(report);
     if (!error) return { status: 'synced' };
   }
@@ -27,6 +27,7 @@ export async function saveReport(report) {
 }
 
 export async function syncPending(onProgress) {
+    if (!LIVE_SYNC_ENABLED) return { synced: 0, total: 0 };
   const db = await dbPromise;
   const pending = await db.getAll(STORE_NAME);
   let synced = 0;
@@ -45,6 +46,13 @@ export async function syncPending(onProgress) {
 export async function pendingCount() {
   const db = await dbPromise;
   return (await db.getAll(STORE_NAME)).length;
+}
+
+/** Full queued items (not just a count) — used to render the queue status
+ * list so the user can see WHAT is waiting to sync, not just how many. */
+export async function listPending() {
+  const db = await dbPromise;
+  return db.getAll(STORE_NAME);
 }
 
 window.addEventListener('online', () => { syncPending(); });
